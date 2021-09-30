@@ -8,12 +8,13 @@
 TOP=`readlink -f "$0" | xargs dirname`
 
 get_params() {
-	while getopts bse OPT
+	while getopts bsem OPT
 	do
 		case $OPT in
 			b) NAME_BIN=1;;
 			s) NAME_SRC=1;;
 			e) NAME_ENV=1;;
+			m) MMP_FLAG=1;;
 			*) exit 1;;
 		esac
 	done
@@ -38,6 +39,8 @@ get_params() {
 	COMMIT_OPENEMBEDDED=`grep "^${VER}_O" ${TOP}/scripts/version | sed -e "s/^${VER}_O=//g"`
 	COMMIT_RENESAS=`     grep "^${VER}_R" ${TOP}/scripts/version | sed -e "s/^${VER}_R=//g"`
 	LIST=`               grep "^${VER}_L" ${TOP}/scripts/version | sed -e "s/^${VER}_L=//g"`
+	ZIP_1=`              grep "^${VER}_ZIP1" ${TOP}/scripts/version | sed -e "s/^${VER}_ZIP1=//g"`
+	ZIP_2=`              grep "^${VER}_ZIP2" ${TOP}/scripts/version | sed -e "s/^${VER}_ZIP2=//g"`
 	CONF_PATH=meta-rcar-gen3/docs/sample/conf/${TARGET}/poky-gcc/bsp
 	ARCH_MODE=patched # original  patched  configured
 
@@ -107,6 +110,13 @@ conf_path_check() {
 	fi
 }
 
+install_mmp_eva_package() {
+	if [ x${MMP_FLAG} != x ]; then
+		. ${TOP}/scripts/setup_mm_packages.sh
+		copy_mm_packages
+	fi
+}
+
 target_build() {
 	(
 		. poky/oe-init-build-env
@@ -117,6 +127,10 @@ target_build() {
 
 		cp ../meta-renesas/${CONF_PATH}/*.conf ./conf/
 
+		if [ x${MMP_FLAG} != x ]; then
+			cp ./conf/local-wayland.conf ./conf/local.conf
+		fi
+
 		if [ x${NAME_SRC} != x ]; then
 			echo						>> ./conf/local.conf
 			echo "# added by renesas-yocto-maker"		>> ./conf/local.conf
@@ -124,7 +138,11 @@ target_build() {
 			echo "ARCHIVER_MODE[src] = \"$ARCH_MODE\""	>> ./conf/local.conf
 		fi
 
-		bitbake core-image-minimal
+		if [ x${MMP_FLAG} != x ]; then
+			bitbake core-image-weston
+		else
+			bitbake core-image-minimal
+		fi
 	)
 	[ x$? != x0 ] && exit
 }
@@ -172,5 +190,6 @@ target_checkout poky			${COMMIT_POKY}
 target_checkout meta-openembedded	${COMMIT_OPENEMBEDDED}
 target_checkout meta-renesas		${COMMIT_RENESAS}
 conf_path_check
+install_mmp_eva_package
 target_build
 run_option
