@@ -8,13 +8,14 @@
 TOP=`readlink -f "$0" | xargs dirname`
 
 get_params() {
-	while getopts bsem OPT
+	while getopts bsemk OPT
 	do
 		case $OPT in
 			b) NAME_BIN=1;;
 			s) NAME_SRC=1;;
 			e) NAME_ENV=1;;
 			m) MMP_FLAG=1;;
+			k) KF_FLAG=1;;
 			*) exit 1;;
 		esac
 	done
@@ -38,6 +39,7 @@ get_params() {
 	COMMIT_POKY=`        grep "^${VER}_P" ${TOP}/scripts/version | sed -e "s/^${VER}_P=//g"`
 	COMMIT_OPENEMBEDDED=`grep "^${VER}_O" ${TOP}/scripts/version | sed -e "s/^${VER}_O=//g"`
 	COMMIT_RENESAS=`     grep "^${VER}_R" ${TOP}/scripts/version | sed -e "s/^${VER}_R=//g"`
+	COMMIT_RCAR=`        grep "^${VER}_K" ${TOP}/scripts/version | sed -e "s/^${VER}_K=//g"`
 	LIST=`               grep "^${VER}_L" ${TOP}/scripts/version | sed -e "s/^${VER}_L=//g"`
 	ZIP_1=`              grep "^${VER}_ZIP1" ${TOP}/scripts/version | sed -e "s/^${VER}_ZIP1=//g"`
 	ZIP_2=`              grep "^${VER}_ZIP2" ${TOP}/scripts/version | sed -e "s/^${VER}_ZIP2=//g"`
@@ -49,6 +51,7 @@ get_params() {
 	     x${COMMIT_POKY}		= x	-o\
 	     x${COMMIT_OPENEMBEDDED}	= x	-o\
 	     x${COMMIT_RENESAS}		= x	-o\
+	     x${COMMIT_RCAR}		= x	-o\
 	     x${CONF_PATH}		= x ]; then
 		echo "parameter error"
 		exit
@@ -73,6 +76,10 @@ target_clone() {
 	[ ! -d poky ]			&& git clone git://git.yoctoproject.org/poky &
 	[ ! -d meta-openembedded ]	&& git clone git://git.openembedded.org/meta-openembedded &
 	[ ! -d meta-renesas ]		&& git clone git://github.com/renesas-rcar/meta-renesas.git &
+
+	if [ x${KF_FLAG} != x ]; then
+		[ ! -d meta-rcar ]		&& git clone git://github.com/CogentEmbedded/meta-rcar.git &
+	fi
 
 	# Wait for all clone operations
 	wait
@@ -131,6 +138,10 @@ target_build() {
 			cp ./conf/local-wayland.conf ./conf/local.conf
 		fi
 
+		if [ x${KF_FLAG} != x ]; then
+			bitbake-layers add-layer ../meta-rcar/meta-rcar-gen3-adas
+		fi
+
 		if [ x${NAME_SRC} != x ]; then
 			echo						>> ./conf/local.conf
 			echo "# added by renesas-yocto-maker"		>> ./conf/local.conf
@@ -178,6 +189,7 @@ run_option() {
 		ln -s ../../build/downloads	${NAME_ENV}/build
 		ln -s ../meta-openembedded	${NAME_ENV}
 		ln -s ../meta-renesas		${NAME_ENV}
+		ln -s ../meta-rcar		${NAME_ENV}
 		ln -s ../poky			${NAME_ENV}
 		tar -jchf ${NAME_ENV}.tar.bz2	${NAME_ENV}
 		rm -fr ${NAME_ENV}
@@ -189,6 +201,7 @@ target_clone
 target_checkout poky			${COMMIT_POKY}
 target_checkout meta-openembedded	${COMMIT_OPENEMBEDDED}
 target_checkout meta-renesas		${COMMIT_RENESAS}
+target_checkout meta-rcar		${COMMIT_RCAR}
 conf_path_check
 install_mmp_eva_package
 target_build
